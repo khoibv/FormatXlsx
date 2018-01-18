@@ -26,7 +26,13 @@ namespace AccBear.FormatDocuments
 
         private void btnInputDir_Click(object sender, EventArgs e)
         {
-            var dialog = new FolderBrowserDialog();
+
+            var dialog = new FolderBrowserDialog
+            {
+                ShowNewFolderButton = false,
+                SelectedPath = Directory.Exists(txtInputDir.Text) ? txtInputDir.Text : Environment.SpecialFolder.Personal.ToString(),
+            };
+
             if (DialogResult.OK == dialog.ShowDialog())
             {
                 txtInputDir.Text = dialog.SelectedPath;
@@ -35,7 +41,12 @@ namespace AccBear.FormatDocuments
 
         private void btnOutputDir_Click(object sender, EventArgs e)
         {
-            var dialog = new FolderBrowserDialog();
+            var dialog = new FolderBrowserDialog
+            {
+                ShowNewFolderButton = true,
+                SelectedPath = Directory.Exists(txtOutputDir.Text) ? txtOutputDir.Text : Environment.SpecialFolder.Personal.ToString(),
+            };
+
             if (DialogResult.OK == dialog.ShowDialog())
             {
                 txtOutputDir.Text = dialog.SelectedPath;
@@ -59,8 +70,10 @@ namespace AccBear.FormatDocuments
                 Directory.CreateDirectory(outputDir);
             }
 
-            foreach (var file in new DirectoryInfo(inputDir).GetFiles("*.xlsx", SearchOption.AllDirectories))
+            int fileCount = 0;
+            foreach (var file in new DirectoryInfo(inputDir).GetFiles("*.xls?", SearchOption.AllDirectories))
             {
+                fileCount++;
                 var inputWorkbook = Globals.ThisAddIn.Application.Workbooks.Open(
                     Filename: file.FullName,
                     UpdateLinks: MISSING,
@@ -83,7 +96,7 @@ namespace AccBear.FormatDocuments
                 foreach (Worksheet sheet in inputWorkbook.Worksheets)
                 {
                     // Set fonts
-                    sheet.UsedRange.Font.Name = selectedFont.Name;
+                    sheet.UsedRange.Font.Name = MapFont(selectedFont.Name);
                     sheet.UsedRange.Font.Size = selectedFont.Size;
 
                     // Page layout
@@ -112,12 +125,18 @@ namespace AccBear.FormatDocuments
                 // and file path=D:/ACC/Input/Function01/Sub001/File01.xlsx
                 // then subPath = Function01/Sub001
                 var subPath = file.Directory.FullName.Replace(inputDir, string.Empty);
-                var outputFile = Path.Combine(outputDir, subPath, file.Name);
+                if (subPath.StartsWith(@"\")) { subPath = subPath.Substring(1); }
+                var outputPath = Path.Combine(outputDir, subPath);
+                if (!Directory.Exists(outputPath))
+                {
+                    Directory.CreateDirectory(outputPath);
+                }
+                var outputFile = Path.Combine(outputPath, file.Name);
                 inputWorkbook.SaveAs(Filename: outputFile);
                 inputWorkbook.Close();
             }
             this.Enabled = true;
-            MessageBox.Show("Completed....");
+            MessageBox.Show($"Completed. Processed {fileCount} file(s)");
         }
 
         private void btnFont_Click(object sender, EventArgs e)
@@ -140,5 +159,10 @@ namespace AccBear.FormatDocuments
             txtFont.Text = $"{selectedFont.Name}, {selectedFont.Size}";
         }
 
+
+        private string MapFont(string fontName)
+        {
+            return fontName == "MS PGothic" ? "ＭＳ Ｐゴシック" : fontName;
+        }
     }
 }
